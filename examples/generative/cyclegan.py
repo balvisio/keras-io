@@ -409,12 +409,25 @@ class CycleGan(keras.Model):
         self.lambda_identity = lambda_identity
 
     def call(self, inputs):
-        return (
-            self.disc_X(inputs),
-            self.disc_Y(inputs),
-            self.gen_G(inputs),
-            self.gen_F(inputs),
-        )
+        """
+        Takes as input a list of Tensors of length 4. Populate one of the elements in the list
+        to call the corresponding generator or discriminator:
+        0 - disc_X
+        1 - disc_Y
+        2 - gen_G
+        3 - gen_F
+        """
+        if inputs[0] != None:
+            return self.disc_X(inputs[0])
+
+        if inputs[1] != None:
+            return self.disc_Y(inputs[1])
+
+        if inputs[2] != None:
+            return self.gen_G(inputs[2])
+
+        if inputs[3] != None:
+            return self.gen_F(inputs[3])
 
     def compile(
         self,
@@ -456,25 +469,25 @@ class CycleGan(keras.Model):
 
         with tf.GradientTape(persistent=True) as tape:
             # Horse to fake zebra
-            fake_y = self.gen_G(real_x, training=True)
+            fake_y = self([None, None, real_x, None], training=True)
             # Zebra to fake horse -> y2x
-            fake_x = self.gen_F(real_y, training=True)
+            fake_x = self([None, None, None, real_y], training=True)
 
             # Cycle (Horse to fake zebra to fake horse): x -> y -> x
-            cycled_x = self.gen_F(fake_y, training=True)
+            cycled_x = self([None, None, None, fake_y], training=True)
             # Cycle (Zebra to fake horse to fake zebra) y -> x -> y
-            cycled_y = self.gen_G(fake_x, training=True)
+            cycled_y = self([None, None, fake_x, None], training=True)
 
             # Identity mapping
-            same_x = self.gen_F(real_x, training=True)
-            same_y = self.gen_G(real_y, training=True)
+            same_x = self([None, None, None, real_x], training=True)
+            same_y = self([None, None, real_y, None], training=True)
 
             # Discriminator output
-            disc_real_x = self.disc_X(real_x, training=True)
-            disc_fake_x = self.disc_X(fake_x, training=True)
+            disc_real_x = self([real_x, None, None, None], training=True)
+            disc_fake_x = self([fake_x, None, None, None], training=True)
 
-            disc_real_y = self.disc_Y(real_y, training=True)
-            disc_fake_y = self.disc_Y(fake_y, training=True)
+            disc_real_y = self([None, real_y, None, None], training=True)
+            disc_fake_y = self([None, fake_y, None, None], training=True)
 
             # Generator adverserial loss
             gen_G_loss = self.generator_loss_fn(disc_fake_y)
